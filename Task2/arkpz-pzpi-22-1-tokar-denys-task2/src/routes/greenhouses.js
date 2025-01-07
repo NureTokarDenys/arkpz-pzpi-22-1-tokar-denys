@@ -12,6 +12,16 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET all greenhouses of a specific user
+router.get('/user/:userId', async (req, res) => {
+  try {
+      const greenhouses = await Greenhouse.find({ ownerId: req.params.userId }).populate('ownerId', 'username');
+      res.json(greenhouses);
+  } catch (err) {
+      res.status(500).json({ message: err.message });
+  }
+});
+
 // GET one greenhouse
 router.get('/:id', getGreenhouse, (req, res) => {
   res.json(res.greenhouse);

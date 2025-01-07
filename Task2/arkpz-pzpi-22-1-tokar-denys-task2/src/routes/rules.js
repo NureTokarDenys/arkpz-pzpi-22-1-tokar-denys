@@ -12,6 +12,16 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET all rules of a specific greenhouse
+router.get('/greenhouse/:greenhouseId', async (req, res) => {
+  try {
+      const rules = await Rule.find({ greenhouseId: req.params.greenhouseId });
+      res.json(rules);
+  } catch (err) {
+      res.status(500).json({ message: err.message });
+  }
+});
+
 // GET one rule
 router.get('/:id', getRule, (req, res) => {
   res.json(res.rule);
@@ -21,11 +31,11 @@ router.get('/:id', getRule, (req, res) => {
 router.post('/', async (req, res) => {
     const newRule = new Rule({
       greenhouseId: req.body.greenhouseId,
-      condition: req.body.condition,
-      action: req.body.action,
+      condition: req.body.condition, // ['time_based', 'sensor_based']
+      action: req.body.action, // ['start_fertilizing', 'stop_fertilizing', 'turn_on_light', 'turn_off_light', 'start_cooling', 'stop_cooling']
       schedule: req.body.schedule,
       threshold: req.body.threshold,
-      status: req.body.status
+      status: req.body.status // ['active', 'inactive']
   });
     try {
       const savedRule = await newRule.save();

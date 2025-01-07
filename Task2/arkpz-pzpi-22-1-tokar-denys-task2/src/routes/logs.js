@@ -31,7 +31,7 @@ router.get('/:id', getLog, (req, res) => {
 router.post('/', async (req, res) => {
     const newLog = new Log({
         greenhouseId: req.body.greenhouseId,
-        type: req.body.type,
+        type: req.body.type, // ['error', 'info']
         message: req.body.message,
       timestamp: req.body.timestamp ? new Date(req.body.timestamp) : new Date()
   });

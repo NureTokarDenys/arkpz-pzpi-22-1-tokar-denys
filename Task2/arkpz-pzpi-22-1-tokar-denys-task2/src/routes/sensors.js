@@ -12,6 +12,16 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET all sensors of a specific greenhouse
+router.get('/greenhouse/:greenhouseId', async (req, res) => {
+  try {
+      const sensors = await Sensor.find({ greenhouseId: req.params.greenhouseId }).populate('greenhouseId', 'name');
+      res.json(sensors);
+  } catch (err) {
+      res.status(500).json({ message: err.message });
+  }
+});
+
 // GET one sensor
 router.get('/:id', getSensor, (req, res) => {
   res.json(res.sensor);
@@ -20,10 +30,10 @@ router.get('/:id', getSensor, (req, res) => {
 // POST a new sensor
 router.post('/', async (req, res) => {
     const sensor = new Sensor({
-        type: req.body.type,
+        type: req.body.type, // ['temperature', 'humidity', 'light']
         greenhouseId: req.body.greenhouseId,
         model: req.body.model,
-        status: req.body.status,
+        status: req.body.status, // ['active', 'inactive']
         unit: req.body.unit,
         lastValue: req.body.lastValue,
         lastUpdated: req.body.lastUpdated
