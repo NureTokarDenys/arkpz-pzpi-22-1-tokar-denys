@@ -114,7 +114,6 @@ async function logEvent(greenhouseId, type, message){
     });
     try{
         await newLog.save()
-         console.log(`Event logged: ${message}`);
     }catch(e){
         console.error(`Failed to log event: ${message}, error: ${e.message}`)
     }

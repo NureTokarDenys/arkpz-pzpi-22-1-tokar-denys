@@ -37,7 +37,6 @@ router.post('/', async (req, res) => {
     if (!sensorId || value === undefined) {
       return res.status(400).json({ message: 'Missing sensorId or value in request body' });
     }
-
     const sensor = await Sensor.findById(sensorId).populate('greenhouseId');
     if (!sensor) {
       return res.status(400).json({ message: 'Invalid sensorId' });
@@ -50,23 +49,29 @@ router.post('/', async (req, res) => {
     });
     const savedSensorData = await newSensorData.save();
 
-     await logEvent(sensor.greenhouseId, 'info', `Data received from sensor ${sensorId}: ${value}`);
+    await logEvent(sensor.greenhouseId, 'info', `Data received from sensor ${sensorId}: ${value}`);
+    
+    const commands = [];
+    const sensorBasedCommand = await analyzeAndGenerateCommands(sensorId, savedSensorData);
+     if(sensorBasedCommand){
+        commands.push(sensorBasedCommand)
+      }
+    const timeBasedCommands = await checkTimeBasedRules(sensor.greenhouseId);
+     if(timeBasedCommands && timeBasedCommands.length > 0){
+          commands.push(...timeBasedCommands)
+       }
 
-    const command = await analyzeAndGenerateCommands(sensorId, savedSensorData);
-    const timeBasedCommand = await checkTimeBasedRules(sensor.greenhouseId)
-    const response = { message: 'Sensor data saved'}
-    if (command) {
-       response.command = command;
-    }else if(timeBasedCommand){
-        response.command = timeBasedCommand;
+    const response = { message: 'Sensor data saved' };
+    if (commands.length > 0) {
+      response.commands = commands;
     }
-
     return res.status(201).json(response);
   } catch (err) {
     console.error('Error while processing sensor data:', err);
     res.status(500).json({ message: 'Failed to save sensor data' });
   }
 });
+
 
 // PATCH an existing sensor data entry
 router.patch('/:id', getSensorData, async (req, res) => {
@@ -112,63 +117,106 @@ async function getSensorData(req, res, next) {
 }
 
 async function analyzeAndGenerateCommands(sensorId, sensorData) {
-  const sensor = await Sensor.findById(sensorId).populate('greenhouseId');
-    if (!sensor) {
-      console.error('Invalid sensorId. No analysis or command generation');
-        return null;
-    }
-    const greenhouseId = sensor.greenhouseId._id;
-  const rules = await Rule.find({ greenhouseId });
-  if (!rules || rules.length === 0) {
-       console.error('No rules. No analysis or command generation');
-        return null;
-    }
-    for (const rule of rules) {
-        let conditionMet = false;
-        if (rule.condition === 'sensor_based') {
-           if (!rule.threshold || typeof rule.threshold !== 'object') {
-              console.error(`Threshold must be an object. Skip rule: ${rule._id}`);
-              continue;
-             }
-            for (const sensorType in rule.threshold) {
-                  if (sensor.type === sensorType) {
-                      if (rule.threshold[sensorType] && sensorData.value > rule.threshold[sensorType]) {
-                         conditionMet = true;
-                      }
-                  }
-           }
-        } else if (rule.condition === 'time_based') {
-          continue;
-        }
-        return conditionMet ? rule.action : null;
-    }
-    return null
+  const sensor = await getSensor(sensorId);
+  if (!sensor) return null;
+  
+  const rules = await getRules(sensor.greenhouseId._id);
+  if (!rules?.length) return null;
+  
+  const matchingActions = [];
+  
+  for (const rule of rules) {
+      const result = await processRule(rule, sensor, sensorData);
+      if (result) matchingActions.push(result);
+  }
+  
+  return matchingActions.length > 0 ? matchingActions : null;
 }
 
+async function getSensor(sensorId) {
+  const sensor = await Sensor.findById(sensorId).populate('greenhouseId');
+  if (!sensor) {
+      console.error('Invalid sensorId. No analysis or command generation');
+      return null;
+  }
+  return sensor;
+}
+
+async function getRules(greenhouseId) {
+  const rules = await Rule.find({ greenhouseId });
+  if (!rules?.length) {
+      console.error('No rules. No analysis or command generation');
+      return null;
+  }
+  return rules;
+}
+
+function processRule(rule, sensor, sensorData) {
+  if (rule.condition === 'time_based') return null;
+  
+  if (!isValidThreshold(rule)) return null;
+  
+  const conditionMet = checkRuleCondition(rule, sensor, sensorData);
+  
+  return conditionMet ? rule.action : null;
+}
+
+function isValidThreshold(rule) {
+  if (!rule.threshold || typeof rule.threshold !== 'object') {
+      console.log(`Threshold must be an object. Skip rule: ${rule._id}`);
+      return false;
+  }
+  return true;
+}
+
+function checkRuleCondition(rule, sensor, sensorData) {
+  const actionThresholds = {
+      'start_cooling': (value, threshold) => value > threshold,
+      'stop_cooling': (value, threshold) => value < threshold,
+      'start_heating': (value, threshold) => value < threshold,
+      'stop_heating': (value, threshold) => value > threshold,
+      'turn_on_light': (value, threshold) => value < threshold,
+      'turn_off_light': (value, threshold) => value > threshold,
+      'start_fertilizing': (value, threshold) => value > threshold,
+      'stop_fertilizing': (value, threshold) => value < threshold
+  };
+
+  for (const sensorType in rule.threshold) {
+      if (sensor.type !== sensorType) continue;
+      
+      const thresholdCheck = actionThresholds[rule.action];
+      if (!thresholdCheck) continue;
+      
+      return thresholdCheck(sensorData.value, rule.threshold[sensorType]);
+  }
+  return false;
+}
 
 async function checkTimeBasedRules(greenhouseId) {
-  try {
-    const currentTime = new Date();
-    const currentHour = currentTime.getHours();
-    const currentMinute = currentTime.getMinutes();
-    const rules = await Rule.find({
-      condition: 'time_based',
-      greenhouseId: greenhouseId,
-      status: 'active',
-    }).populate('greenhouseId');
-      for (const rule of rules) {
-         if (!rule.schedule || !rule.schedule.time) {
-           continue;
-         }
-        const [ruleHour, ruleMinute] = rule.schedule.time.split(':').map(Number);
-        if (currentHour === ruleHour && currentMinute === ruleMinute) {
-            return rule.action
-         }
+    try {
+      const currentTime = new Date();
+      const currentHour = currentTime.getHours();
+      const currentMinute = currentTime.getMinutes();
+       const rules = await Rule.find({
+         condition: 'time_based',
+         greenhouseId: greenhouseId,
+         status: 'active',
+       }).populate('greenhouseId');
+        const commands = [];
+        for (const rule of rules) {
+          if (!rule.schedule || !rule.schedule.time) {
+             console.error(`checkTimeBasedRules: Schedule time is not configured for time based rule. Skip rule: ${rule._id}`);
+             continue;
+            }
+           const [ruleHour, ruleMinute] = rule.schedule.time.split(':').map(Number);
+            if (currentHour === ruleHour && currentMinute === ruleMinute) {
+              commands.push(rule.action);
+            }
       }
-      return null
-   } catch (err) {
-     console.error('Error while processing time based rules', err);
-     return null
+      return (commands.length > 0) ?  commands : null;
+    } catch (err) {
+        console.error("Error while processing time based rules", err);
+        return null;
     }
 }
 
