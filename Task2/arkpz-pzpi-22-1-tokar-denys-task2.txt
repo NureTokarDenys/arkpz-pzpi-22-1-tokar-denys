@@ -1,0 +1,1149 @@
+Харківський університет радіоелектроніки
+Факультет комп'ютерних наук
+Кафедра програмної інженерії
+
+
+
+
+ЗВІТ
+до лабораторної роботи з дисципліни
+"Аналіз та рефакторинг коду"
+на тему: "РОЗРОБКА БАЗИ ДАНИХ ДЛЯ СЕРВЕРНОЇ ЧАСТИНИ ПРОГРАМНОЇ СИСТЕМИ ТА ПРИКЛАДНОГО ПРОГРАМНОГО ІНТЕРФЕЙСУ (API)"
+
+
+
+
+Виконав ст. гр. ПЗПІ-22-1
+Токар Денис Юрійович
+
+
+Перевірив
+Сокорчук Ігор Петрович
+
+
+
+Харків 2024 р.
+1 Мета
+Спроектувати базу даних для серверної частини додатка. Розробити прикладний програмний інтерфейс(API) для роботи з базою даних.
+1 Хід роботи
+1. Розробка архітектури програмної системи
+1.1. Архітектурний огляд системи
+Система складається з трьох основних компонентів, які взаємодіють для забезпечення автоматизованого управління теплицями:
+I.	Серверна частина:
+•	API-сервер:
+•	База даних:
+•	Модуль обробки даних та автоматизації:
+II.	IoT-клієнт:
+•	Датчики мікроклімату (температура, вологість, освітленість);
+•	Мікроконтролер для збору та передачі даних;
+III.	Клієнтська частина:
+•	Веб-інтерфейс для користувача.
+1.2. Деталізація компонентів системи
+1)	Серверна частина:
+•	API-сервер:
+o	Функціональність:
+I.	Прийом та обробка HTTP запитів від веб-клієнта;
+II.	Взаємодія з базою даних для збереження та отримання даних про теплиці, датчики, вимірювання та правила;
+III.	Прийом даних від IoT-клієнтів;
+IV.	Реалізація логіки автоматизації (на основі правил);
+o	Технології:
+I.	Мова програмування: Node.js (Express.js);
+II.	API-протокол: RESTful API;
+III.	Безпека: JWT для аутентифікації та авторизації користувачів;
+•	База даних:
+o	Функціональність:
+I.	Зберігання інформації про користувачів, теплиці, датчики, вимірювання, правила автоматизації, журнали подій;
+o	Технології:
+I.	База даних: MongoDB;
+•	Модуль обробки даних та автоматизації:
+o	Функціональність:
+I.	Обробка даних від IoT-датчиків;
+II.	Збереження даних вимірювань у базі;
+III.	Виконання дій відповідно до правил автоматизації (наприклад, полив, освітлення, провітрювання);
+o	Технології:
+I.	Мова програмування: Node.js
+2)	IoT-клієнт:
+•	Датчики:
+o	Функціональність:
+I.	Вимірювання температури, вологості та освітленості в реальному часі;
+o	Технології:
+I.	Обладнання: Датчики DHT22, фоторезистори або аналогічні;
+•	Мікроконтролер:
+o	Функціональність:
+I.	Збір даних з датчиків;
+II.	Передача даних на сервер;
+o	Технології:
+I.	Мікроконтролер: ESP32;
+II.	Протокол зв’язку: Wi-Fi
+3)	Клієнтська частина:
+•	Веб-інтерфейс:
+o	Функціональність:
+I.	Реєстрація та авторизація користувачів;
+II.	Перегляд інформації про теплиці;
+III.	Моніторинг параметрів мікроклімату в реальному часі;
+IV.	Налаштування правил автоматизації;
+V.	Перегляд історії вимірювань та журналів подій.
+o	Технології:
+I.	Фреймворк: React.js
+
+1.3. Інтеграція компонентів
+•	Взаємодія IoT-клієнта з сервером:
+o	Протокол обміну даними: HTTP;
+o	Безпека: Передача токену в заголовку
+•	Взаємодія клієнтської частини з сервером:
+o	API-запити: RESTful запити з використанням HTTP методів (GET, POST, PATCH, DELETE);
+o	Формат даних: JSON для легкого парсингу та взаємодії між клієнтом та сервером;
+o	Аутентифікація та авторизація: Використання JWT.
+1.4. Безпека та ролі користувачів
+Система(веб-додаток) надає функціонал тільки авторизованим користувачам, доступ до ендпоінтів також обмежений для неавторизованих користувачів.
+1.5. Схема архітектури системи
+ [Веб Клієнт]  <-->   (REST API)  <-->  [API-Сервер] <--(MongoDB)--> [База Даних]
+|
+[IoT Сенсори] --(Wi-Fi)--> [ESP32]
+2. Створення UML діаграми прецедентів для серверної частини системи
+ 
+Рисунок 1 – UML діаграма прецедентів.
+3. Створення ER-діаграми даних
+ 
+Рисунок 2 - ER-діаграма.
+
+4. Розробка бази даних програмної системи
+Базу даних розроблено з використанням NoSQL бази даних MongoDB, вона буде відображати ER діаграму та функціональні вимоги.
+Результатом розробки є набір моделей (схем) для MongoDB, представлених у папці `models`. Склад цієї папки продубльовано в додатку А.
+5. Розробка функцій роботи з БД (ORM)
+Для зручнішої роботи та інтеграції з базою даних, було обрано Mongoose, що дозволяє ефективно встановлювати звʼязок між MongoDB базою даних і Node.js(Express) сервером.
+6. Розробка API (REST) для взаємодії серверної частини з клієнтами
+Використовуючи технології Node.js, фреймворк Express.js та підготовані моделі Mongoose, розробимо типові CRUD шляхи для взаємодії з базою даних через клієнта. Для кожної моделі реалізовано такі шляхи: створити, змінити, отримати всі, отримати один, видалити, а також додаткові шляхи для отримання всіх сутностей за певними критеріями (наприклад, всі сенсори теплиці).
+7. Створення специфікації розробленого API
+Для легкої інтеграції розробимо специфікацію у форматі OpenAPI. (файл специфікації наведено в додатку Б).
+8. Тестування системи
+Записуємо відео з тестуванням взаємодії серверної частини та бази даних і серверної частини й клієнта, проставляємо таймкоди та завантажуємо на сервіс YouTube. Посилання на відео: https://youtu.be/bQfW52hN2qI.
+ 
+Висновки
+В ході виконання лабораторної роботи було успішно спроектовано та розроблено базу даних для серверної частини програмної системи автоматизованого управління теплицями з використанням MongoDB. Було створено повноцінний набір моделей даних, що включає користувачів, теплиці, датчики, дані вимірювань, правила автоматизації та логи подій. На основі цих моделей розроблено REST API з використанням Node.js та Express.js, що забезпечує повний спектр операцій для взаємодії з базою даних. Для зручності інтеграції та тестування було створено детальну OpenAPI специфікацію, яка документує всі доступні ендпоінти та формати даних. Розроблена система забезпечує надійну основу для подальшої розробки клієнтської частини та інтеграції з IoT-пристроями.
+ 
+Додаток А
+(моделі застосунку)
+User.js
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const UserSchema = new Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    email: String,
+}, { timestamps: true });
+
+module.exports = mongoose.model('User', UserSchema);
+
+Greenhouse.js
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const greenhouseSchema = new Schema({
+    name: { type: String },
+    location: { type: String },
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, 
+    createdAt: { type: Date, default: Date.now },
+});
+
+module.exports = mongoose.model('Greenhouse', greenhouseSchema);
+
+Sensor.js
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const sensorSchema = new Schema({
+    type: { type: String, required: true, enum: ['temperature', 'humidity', 'light'] }, 
+    greenhouseId: { type: Schema.Types.ObjectId, ref: 'Greenhouse', required: true },
+    model: { type: String },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+    unit: { type: String, required: true },
+    lastValue: { type: Schema.Types.Mixed },
+    lastUpdated: { type: Date },
+});
+
+module.exports = mongoose.model('Sensor', sensorSchema);
+
+SensorData.js
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const sensorDataSchema = new Schema({
+    sensorId: { type: Schema.Types.ObjectId, ref: 'Sensor', required: true },
+    timestamp: { type: Date, default: Date.now },
+    value: { type: Schema.Types.Mixed, required: true },
+});
+
+module.exports = mongoose.model('SensorData', sensorDataSchema);
+
+Rule.js
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const ruleSchema = new Schema({
+    greenhouseId: { type: Schema.Types.ObjectId, ref: 'Greenhouse', required: true },
+    condition: { type: String, required: true, enum: ['time_based', 'sensor_based'] },
+    action: { 
+      type: String, 
+      required: true, 
+      enum: ['start_fertilizing', 'stop_fertilizing', 'turn_on_light', 'turn_off_light', 'start_cooling', 'stop_cooling'] 
+    },
+    schedule: { type: Object, default: null }, 
+    threshold: { type: Object, default: null },
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+});
+
+module.exports = mongoose.model('Rule', ruleSchema);
+
+Log.js
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const logSchema = new Schema({
+    greenhouseId: { type: Schema.Types.ObjectId, ref: 'Greenhouse', required: true },
+    type: { type: String, enum: ['error', 'info'], default: 'info' },
+    message: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+});
+
+module.exports = mongoose.model('Log', logSchema);
+
+ 
+Додаток Б
+(специфікація OpenAPI)
+openapi: 3.0.0
+info:
+  title: API Програмної системи автономних теплиць
+  version: 1.0.0
+  description: API для керування автономними теплицями.
+servers:
+  - url: http://localhost:3000/api
+paths:
+  /users:
+    get:
+      summary: Отримати список усіх користувачів
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      summary: Створити нового користувача
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: Користувача успішно створено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /users/{id}:
+    get:
+      summary: Отримати інформацію про конкретного користувача
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID користувача
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Користувача не знайдено
+    patch:
+      summary: Оновити інформацію про користувача
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID користувача
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Інформацію про користувача успішно оновлено
+          content:
+             application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: Користувача не знайдено
+    delete:
+      summary: Видалити користувача
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID користувача
+      responses:
+        '200':
+          description: Користувача успішно видалено
+        '404':
+          description: Користувача не знайдено
+  /greenhouses:
+    get:
+      summary: Отримати список всіх теплиць
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Greenhouse'
+    post:
+      summary: Створити нову теплицю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GreenhouseCreate'
+      responses:
+        '201':
+          description: Теплицю успішно створено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Greenhouse'
+  /greenhouses/user/{userId}:
+      get:
+        summary: Отримати список всіх теплиць певного користувача
+        parameters:
+          - in: path
+            name: userId
+            required: true
+            schema:
+              type: string
+            description: ID користувача
+        responses:
+          '200':
+            description: Успішна операція
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Greenhouse'
+  /greenhouses/{id}:
+    get:
+      summary: Отримати інформацію про конкретну теплицю
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID теплиці
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Greenhouse'
+        '404':
+          description: Теплицю не знайдено
+    patch:
+      summary: Оновити інформацію про теплицю
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID теплиці
+      requestBody:
+        required: true
+        content:
+          application/json:
+             schema:
+               $ref: '#/components/schemas/GreenhouseUpdate'
+      responses:
+        '200':
+          description: Інформацію про теплицю успішно оновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Greenhouse'
+        '404':
+           description: Теплицю не знайдено
+    delete:
+      summary: Видалити теплицю
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID теплиці
+      responses:
+        '200':
+          description: Теплицю успішно видалено
+        '404':
+          description: Теплицю не знайдено
+  /sensors:
+    get:
+      summary: Отримати список всіх датчиків
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Sensor'
+    post:
+      summary: Створити новий датчик
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SensorCreate'
+      responses:
+        '201':
+          description: Датчик успішно створено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sensor'
+  /sensors/greenhouse/{greenhouseId}:
+      get:
+        summary: Отримати список всіх датчиків певної теплиці
+        parameters:
+          - in: path
+            name: greenhouseId
+            required: true
+            schema:
+              type: string
+            description: ID теплиці
+        responses:
+          '200':
+            description: Успішна операція
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Sensor'
+  /sensors/{id}:
+    get:
+      summary: Отримати інформацію про конкретний датчик
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID датчика
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sensor'
+        '404':
+          description: Датчик не знайдено
+    patch:
+      summary: Оновити інформацію про датчик
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID датчика
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SensorUpdate'
+      responses:
+        '200':
+          description: Інформацію про датчик успішно оновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sensor'
+        '404':
+           description: Датчик не знайдено
+    delete:
+      summary: Видалити датчик
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID датчика
+      responses:
+        '200':
+          description: Датчик успішно видалено
+        '404':
+          description: Датчик не знайдено
+  /sensordata:
+    get:
+      summary: Отримати всі дані датчиків
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SensorData'
+    post:
+      summary: Створити нові дані датчика
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SensorDataCreate'
+      responses:
+        '201':
+          description: Дані датчика успішно створено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorData'
+  /sensordata/sensor/{sensorId}:
+      get:
+        summary: Отримати всі дані конкретного датчика
+        parameters:
+          - in: path
+            name: sensorId
+            required: true
+            schema:
+              type: string
+            description: ID датчика
+        responses:
+          '200':
+            description: Успішна операція
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SensorData'
+  /sensordata/{id}:
+    get:
+      summary: Отримати конкретні дані датчика
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID даних датчика
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorData'
+        '404':
+          description: Дані датчика не знайдено
+    patch:
+      summary: Оновити дані датчика
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID даних датчика
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SensorDataUpdate'
+      responses:
+        '200':
+          description: Дані датчика успішно оновлено
+          content:
+            application/json:
+              schema:
+                 $ref: '#/components/schemas/SensorData'
+        '404':
+           description: Дані датчика не знайдено
+    delete:
+      summary: Видалити дані датчика
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID даних датчика
+      responses:
+        '200':
+          description: Дані датчика успішно видалено
+        '404':
+          description: Дані датчика не знайдено
+  /rules:
+    get:
+      summary: Отримати список всіх правил
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rule'
+    post:
+      summary: Створити нове правило
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleCreate'
+      responses:
+        '201':
+          description: Правило успішно створено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+  /rules/greenhouse/{greenhouseId}:
+      get:
+        summary: Отримати список всіх правил певної теплиці
+        parameters:
+          - in: path
+            name: greenhouseId
+            required: true
+            schema:
+              type: string
+            description: ID теплиці
+        responses:
+          '200':
+            description: Успішна операція
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Rule'
+  /rules/{id}:
+    get:
+      summary: Отримати інформацію про конкретне правило
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID правила
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+          description: Правило не знайдено
+    patch:
+      summary: Оновити інформацію про правило
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID правила
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleUpdate'
+      responses:
+        '200':
+          description: Інформацію про правило успішно оновлено
+          content:
+             application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+           description: Правило не знайдено
+    delete:
+      summary: Видалити правило
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID правила
+      responses:
+        '200':
+          description: Правило успішно видалено
+        '404':
+          description: Правило не знайдено
+  /logs:
+    get:
+      summary: Отримати список всіх логів
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Log'
+    post:
+      summary: Створити новий лог
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogCreate'
+      responses:
+        '201':
+          description: Лог успішно створено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Log'
+  /logs/greenhouse/{greenhouseId}:
+      get:
+        summary: Отримати список всіх логів певної теплиці
+        parameters:
+          - in: path
+            name: greenhouseId
+            required: true
+            schema:
+              type: string
+            description: ID теплиці
+        responses:
+          '200':
+            description: Успішна операція
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Log'
+  /logs/{id}:
+    get:
+      summary: Отримати конкретний лог
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID лога
+      responses:
+        '200':
+          description: Успішна операція
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Log'
+        '404':
+          description: Лог не знайдено
+    patch:
+      summary: Оновити інформацію про лог
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID лога
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogUpdate'
+      responses:
+        '200':
+          description: Інформацію про лог успішно оновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Log'
+        '404':
+           description: Лог не знайдено
+    delete:
+      summary: Видалити лог
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: ID лога
+      responses:
+        '200':
+          description: Лог успішно видалено
+        '404':
+          description: Лог не знайдено
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Унікальний ідентифікатор користувача
+        username:
+          type: string
+          description: Ім'я користувача
+        password:
+          type: string
+          description: Пароль користувача
+        email:
+          type: string
+          description: Електронна пошта користувача
+        createdAt:
+            type: string
+            format: date-time
+            description: час створення користувача
+        updatedAt:
+             type: string
+             format: date-time
+             description: час останньої зміни користувача
+    UserCreate:
+        type: object
+        properties:
+           username:
+              type: string
+              description: Ім'я користувача
+           password:
+              type: string
+              description: Пароль користувача
+           email:
+              type: string
+              description: Електронна пошта користувача
+        required:
+              - username
+              - password
+    UserUpdate:
+        type: object
+        properties:
+          username:
+              type: string
+              description: Ім'я користувача
+          password:
+              type: string
+              description: Пароль користувача
+          email:
+              type: string
+              description: Електронна пошта користувача
+    Greenhouse:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Унікальний ідентифікатор теплиці
+        name:
+          type: string
+          description: Назва теплиці
+        location:
+          type: string
+          description: Розташування теплиці
+        ownerId:
+          type: string
+          description: ID користувача, що є власником теплиці
+        createdAt:
+          type: string
+          format: date-time
+          description: час створення теплиці
+    GreenhouseCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Назва теплиці
+        location:
+          type: string
+          description: Розташування теплиці
+        ownerId:
+          type: string
+          description: ID користувача, що є власником теплиці
+      required:
+          - name
+          - ownerId
+    GreenhouseUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Назва теплиці
+        location:
+          type: string
+          description: Розташування теплиці
+        ownerId:
+          type: string
+          description: ID користувача, що є власником теплиці
+    Sensor:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Унікальний ідентифікатор датчика
+        type:
+          type: string
+          description: Тип датчика
+        greenhouseId:
+          type: string
+          description: ID теплиці, до якої належить датчик
+        model:
+          type: string
+          description: Модель датчика
+        status:
+          type: string
+          description: Статус датчика
+        unit:
+          type: string
+          description: Одиниця вимірювання
+        lastValue:
+          type: string
+          description: Останнє значення датчика
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Час останнього оновлення
+    SensorCreate:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Тип датчика
+        greenhouseId:
+           type: string
+           description: ID теплиці, до якої належить датчик
+        model:
+          type: string
+          description: Модель датчика
+        unit:
+          type: string
+          description: Одиниця вимірювання
+      required:
+          - type
+          - greenhouseId
+          - unit
+    SensorUpdate:
+       type: object
+       properties:
+         type:
+           type: string
+           description: Тип датчика
+         greenhouseId:
+           type: string
+           description: ID теплиці, до якої належить датчик
+         model:
+           type: string
+           description: Модель датчика
+         status:
+           type: string
+           description: Статус датчика
+         unit:
+           type: string
+           description: Одиниця вимірювання
+         lastValue:
+           type: string
+           description: Останнє значення датчика
+         lastUpdated:
+          type: string
+          format: date-time
+          description: Час останнього оновлення
+    SensorData:
+      type: object
+      properties:
+        _id:
+          type: string
+          description: Унікальний ідентифікатор даних датчика
+        sensorId:
+          type: string
+          description: ID датчика, до якого належать дані
+        timestamp:
+          type: string
+          format: date-time
+          description: Час вимірювання
+        value:
+          type: string
+          description: Значення вимірювання
+    SensorDataCreate:
+      type: object
+      properties:
+        sensorId:
+          type: string
+          description: ID датчика, до якого належать дані
+        timestamp:
+          type: string
+          format: date-time
+          description: Час вимірювання
+        value:
+          type: string
+          description: Значення вимірювання
+      required:
+        - sensorId
+        - value
+    SensorDataUpdate:
+       type: object
+       properties:
+        sensorId:
+          type: string
+          description: ID датчика, до якого належать дані
+        timestamp:
+          type: string
+          format: date-time
+          description: Час вимірювання
+        value:
+          type: string
+          description: Значення вимірювання
+    Rule:
+       type: object
+       properties:
+         _id:
+          type: string
+          description: Унікальний ідентифікатор правила
+         greenhouseId:
+          type: string
+          description: ID теплиці, до якої належить правило
+         condition:
+           type: string
+           description: Умова виконання правила
+         action:
+           type: string
+           description: Дія, яку виконує правило
+         schedule:
+            type: object
+            description: Розклад виконання правила
+         threshold:
+            type: object
+            description: Порогове значення для активації правила
+         status:
+           type: string
+           description: Статус правила
+    RuleCreate:
+      type: object
+      properties:
+        greenhouseId:
+          type: string
+          description: ID теплиці, до якої належить правило
+        condition:
+          type: string
+          description: Умова виконання правила
+        action:
+          type: string
+          description: Дія, яку виконує правило
+        schedule:
+           type: object
+           description: Розклад виконання правила
+        threshold:
+          type: object
+          description: Порогове значення для активації правила
+      required:
+         - greenhouseId
+         - condition
+         - action
+    RuleUpdate:
+        type: object
+        properties:
+          greenhouseId:
+            type: string
+            description: ID теплиці, до якої належить правило
+          condition:
+             type: string
+             description: Умова виконання правила
+          action:
+             type: string
+             description: Дія, яку виконує правило
+          schedule:
+             type: object
+             description: Розклад виконання правила
+          threshold:
+             type: object
+             description: Порогове значення для активації правила
+          status:
+             type: string
+             description: Статус правила
+    Log:
+      type: object
+      properties:
+        _id:
+           type: string
+           description: Унікальний ідентифікатор лога
+        greenhouseId:
+           type: string
+           description: ID теплиці, до якої належить лог
+        type:
+           type: string
+           description: Тип лога
+        message:
+           type: string
+           description: Повідомлення лога
+        timestamp:
+           type: string
+           format: date-time
+           description: Час створення лога
+    LogCreate:
+      type: object
+      properties:
+        greenhouseId:
+          type: string
+          description: ID теплиці, до якої належить лог
+        type:
+          type: string
+          description: Тип лога
+        message:
+           type: string
+           description: Повідомлення лога
+      required:
+        - greenhouseId
+        - message
+    LogUpdate:
+        type: object
+        properties:
+         greenhouseId:
+           type: string
+           description: ID теплиці, до якої належить лог
+         type:
+           type: string
+           description: Тип лога
+         message:
+           type: string
+           description: Повідомлення лога
