@@ -43,7 +43,6 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Invalid sensorId' });
     }
 
-    // Create new sensor data entry
     const newSensorData = new SensorData({
       sensorId: sensorId,
       value: value,
@@ -51,17 +50,18 @@ router.post('/', async (req, res) => {
     });
     const savedSensorData = await newSensorData.save();
 
-    await logEvent(sensor.greenhouseId, 'info', `Data received from sensor ${sensorId}: ${value}`);
+     await logEvent(sensor.greenhouseId, 'info', `Data received from sensor ${sensorId}: ${value}`);
 
     const command = await analyzeAndGenerateCommands(sensorId, savedSensorData);
+    const timeBasedCommand = await checkTimeBasedRules(sensor.greenhouseId)
+    const response = { message: 'Sensor data saved'}
+    if (command) {
+       response.command = command;
+    }else if(timeBasedCommand){
+        response.command = timeBasedCommand;
+    }
 
-      if (command) {
-           await logEvent(sensor.greenhouseId, 'info', `Command "${command}" generated for sensor ${sensorId}`);
-           return res.status(201).json({ message: 'Sensor data saved', command });
-      }
-      return res.status(201).json({ message: 'Sensor data saved' });
-
-
+    return res.status(201).json(response);
   } catch (err) {
     console.error('Error while processing sensor data:', err);
     res.status(500).json({ message: 'Failed to save sensor data' });
@@ -111,67 +111,78 @@ async function getSensorData(req, res, next) {
   next();
 }
 
-
 async function analyzeAndGenerateCommands(sensorId, sensorData) {
   const sensor = await Sensor.findById(sensorId).populate('greenhouseId');
-  if (!sensor) {
-    console.error('Invalid sensorId. No analysis or command generation');
-    return null;
-  }
+    if (!sensor) {
+      console.error('Invalid sensorId. No analysis or command generation');
+        return null;
+    }
     const greenhouseId = sensor.greenhouseId._id;
   const rules = await Rule.find({ greenhouseId });
   if (!rules || rules.length === 0) {
-    console.error('No rules. No analysis or command generation');
-      return null;
-  }
-  for (const rule of rules) {
-      let conditionMet = false;
-         if (rule.condition === 'sensor_based') {
-            if (!rule.threshold || typeof rule.threshold !== 'object') {
-                  console.error(`Threshold must be an object. Skip rule: ${rule._id}`);
-                  continue;
-              }
-              for (const sensorType in rule.threshold) {
-                   if (sensor.type === sensorType) {
-                       if (rule.threshold[sensorType] && sensorData.value > rule.threshold[sensorType]) {
-                           conditionMet = true;
-                       }
-                  }
-            }
-        } else if (rule.condition === 'time_based') {
-          if (!rule.schedule || typeof rule.schedule !== 'object' || !rule.schedule.time) {
-                console.error(`Schedule time is not configured for time based rule. Skip rule: ${rule._id}`);
+       console.error('No rules. No analysis or command generation');
+        return null;
+    }
+    for (const rule of rules) {
+        let conditionMet = false;
+        if (rule.condition === 'sensor_based') {
+           if (!rule.threshold || typeof rule.threshold !== 'object') {
+              console.error(`Threshold must be an object. Skip rule: ${rule._id}`);
               continue;
-          }
-            const currentTime = new Date();
-            const ruleTime = new Date(currentTime.toDateString() + ' ' + rule.schedule.time);
-            if (currentTime >= ruleTime) {
-                conditionMet = true;
-            }
+             }
+            for (const sensorType in rule.threshold) {
+                  if (sensor.type === sensorType) {
+                      if (rule.threshold[sensorType] && sensorData.value > rule.threshold[sensorType]) {
+                         conditionMet = true;
+                      }
+                  }
+           }
+        } else if (rule.condition === 'time_based') {
+          continue;
+        }
+        return conditionMet ? rule.action : null;
+    }
+    return null
+}
+
+
+async function checkTimeBasedRules(greenhouseId) {
+  try {
+    const currentTime = new Date();
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    const rules = await Rule.find({
+      condition: 'time_based',
+      greenhouseId: greenhouseId,
+      status: 'active',
+    }).populate('greenhouseId');
+      for (const rule of rules) {
+         if (!rule.schedule || !rule.schedule.time) {
+           continue;
          }
-      if (conditionMet) {
-        await logEvent(greenhouseId, 'info', `Executing action ${rule.action} for sensor ${sensorId}`);
-        return rule.action;
-      } else {
-          return null;
+        const [ruleHour, ruleMinute] = rule.schedule.time.split(':').map(Number);
+        if (currentHour === ruleHour && currentMinute === ruleMinute) {
+            return rule.action
+         }
       }
-    }
       return null
-}
-
-async function logEvent(greenhouseId, type, message){
-    const newLog = new Log({
-        greenhouseId: greenhouseId,
-        type: type,
-        message: message,
-        timestamp: new Date(),
-    });
-    try{
-        await newLog.save()
-    }catch(e){
-        console.error(`Failed to log event: ${message}, error: ${e.message}`)
+   } catch (err) {
+     console.error('Error while processing time based rules', err);
+     return null
     }
 }
 
-
+async function logEvent(greenhouseId, type, message) {
+  const newLog = new Log({
+    greenhouseId: greenhouseId,
+    type: type,
+    message: message,
+    timestamp: new Date(),
+  });
+  try {
+    await newLog.save();
+  } catch (e) {
+    console.error(`Failed to log event: ${message}, error: ${e.message}`);
+  }
+}
 module.exports = router;
