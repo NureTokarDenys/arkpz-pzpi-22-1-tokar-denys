@@ -7,7 +7,7 @@ const ruleSchema = new Schema({
     action: { 
       type: String, 
       required: true, 
-      enum: ['start_fertilizing', 'stop_fertilizing', 'turn_on_light', 'turn_off_light', 'start_cooling', 'stop_cooling'] 
+      enum: ['start_fertilizing', 'stop_fertilizing', 'turn_on_light', 'turn_off_light', 'start_cooling', 'stop_cooling', "start_heating", "stop_heating"] 
     },
     schedule: { type: Object, default: null }, 
     threshold: { type: Object, default: null },
